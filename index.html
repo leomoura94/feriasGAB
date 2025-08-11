@@ -119,9 +119,11 @@ function renderFerias() {
             <td>${f.retorno}</td>
             <td class="${f.status.toLowerCase()}">${f.status}</td>
             <td>
-                ${supervisorLogado && f.status === "Pendente" ?
+                ${supervisorLogado ? 
                     `<button class="btn aprovado" onclick="aprovar(${idx})">Aprovar</button>
-                     <button class="btn negado" onclick="negar(${idx})">Negar</button>` : ""}
+                     <button class="btn negado" onclick="negar(${idx})">Negar</button>
+                     <button class="btn negado" style="background:#555; margin-left:5px;" onclick="excluir(${idx})">Excluir</button>`
+                : ""}
             </td>
         `;
         tbody.appendChild(tr);
@@ -231,7 +233,7 @@ function agendarFerias() {
 
 function loginSupervisor() {
     const senha = document.getElementById("senhaSupervisor").value;
-    if (senha === "Leo!") {
+    if (senha === "supervisor") {
         supervisorLogado = true;
         alert("Supervisor logado.");
         renderFerias();
@@ -250,6 +252,15 @@ function negar(idx) {
     ferias[idx].status = "Negado";
     salvar();
     renderFerias();
+}
+
+// Função nova para excluir férias
+function excluir(idx) {
+    if (confirm("Tem certeza que deseja excluir esta solicitação de férias?")) {
+        ferias.splice(idx, 1);
+        salvar();
+        renderFerias();
+    }
 }
 
 renderFerias();
