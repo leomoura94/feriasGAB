@@ -110,6 +110,9 @@ function renderFerias() {
     ferias.sort((a, b) => new Date(a.admissao) - new Date(b.admissao));
 
     ferias.forEach((f, idx) => {
+        // Mostra status com " - Enviado" se formularioEnviado == true
+        const statusTexto = f.status + (f.formularioEnviado ? " - Enviado" : "");
+
         let tr = document.createElement("tr");
 
         tr.innerHTML = `
@@ -117,17 +120,30 @@ function renderFerias() {
             <td>${f.inicio}</td>
             <td>${f.fim}</td>
             <td>${f.retorno}</td>
-            <td class="${f.status.toLowerCase()}">${f.status}</td>
-            <td>
+            <td class="${f.status.toLowerCase()}">${statusTexto}</td>
+            <td style="text-align:center;">
                 ${supervisorLogado ? 
                     `<button class="btn aprovado" onclick="aprovar(${idx})">Aprovar</button>
                      <button class="btn negado" onclick="negar(${idx})">Negar</button>
                      <button class="btn" style="background:#555; margin-left:5px;" onclick="excluir(${idx})">Excluir</button>`
                 : ""}
             </td>
+            <td style="text-align:center;">
+                ${supervisorLogado ? 
+                    `<input type="checkbox" id="chkRH_${idx}" ${f.formularioEnviado ? "checked" : ""} onchange="toggleFormularioRH(${idx})">`
+                    : (f.formularioEnviado ? "✔" : "")
+                }
+            </td>
         `;
+
         tbody.appendChild(tr);
     });
+}
+
+function toggleFormularioRH(idx) {
+    ferias[idx].formularioEnviado = !ferias[idx].formularioEnviado;
+    salvar();
+    renderFerias();
 }
 
 // Função para gerar CSV e disparar download
@@ -137,16 +153,14 @@ function baixarCSV() {
         return;
     }
 
-    // Cabeçalho CSV
-    const headers = ["Colaborador", "Início", "Fim", "Retorno", "Status", "Admissão"];
+    const headers = ["Colaborador", "Início", "Fim", "Retorno", "Status", "Admissão", "Formulário RH"];
     const linhas = ferias.map(f => [
-        f.nome, f.inicio, f.fim, f.retorno, f.status, f.admissao
+        f.nome, f.inicio, f.fim, f.retorno, f.status, f.admissao, f.formularioEnviado ? "Sim" : "Não"
     ]);
 
     let csvContent = "";
     csvContent += headers.join(",") + "\n";
     linhas.forEach(linha => {
-        // Escapa vírgulas e aspas
         const escaped = linha.map(campo => `"${String(campo).replace(/"/g, '""')}"`);
         csvContent += escaped.join(",") + "\n";
     });
@@ -257,7 +271,8 @@ function agendarFerias() {
         fim: dataFim.toISOString().split("T")[0], 
         retorno: retorno.toISOString().split("T")[0],
         status: "Pendente", 
-        admissao 
+        admissao,
+        formularioEnviado: false
     });
     salvar();
     renderFerias();
