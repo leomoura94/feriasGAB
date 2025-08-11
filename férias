@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Agendador de Férias — Axtro Tech (Protótipo)</title>
+  <style>
+    :root{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;}
+    body{margin:0;padding:20px;background:#f4f6fb;color:#111}
+    h1{margin:0 0 12px;font-size:20px}
+    .container{display:grid;grid-template-columns:360px 1fr;gap:18px}
+    .card{background:white;border-radius:8px;padding:14px;box-shadow:0 6px 18px rgba(20,25,40,0.06)}
+    label{display:block;font-size:13px;margin:8px 0 6px}
+    select,input[type=date]{width:100%;padding:8px;border-radius:6px;border:1px solid #ddd}
+    button{padding:10px 12px;border-radius:6px;border:0;background:#1f6feb;color:white;cursor:pointer}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}
+    .small{font-size:12px;color:#666}
+    .status-pendente{color:#b36b00;font-weight:600}
+    .status-aprovado{color:#0b7a3f;font-weight:600}
+    .status-negado{color:#b3002d;font-weight:600}
+    .row{display:flex;gap:8px;align-items:center}
+    .muted{color:#666}
+    .warning{color:#b36b00}
+    .controls{display:flex;gap:8px}
+    .right{text-align:right}
+    .notice{background:#fff8e6;padding:8px;border-radius:6px;border:1px solid #fde3b7}
+    .flex-col{display:flex;flex-direction:column}
+    .supervisor-badge{background:#0b7a3f;color:white;padding:6px 8px;border-radius:20px;font-size:12px}
+    .foot{margin-top:12px;font-size:12px;color:#555}
+    .danger{background:#ffefef;border:1px solid #ffd6d6;padding:8px;border-radius:6px}
+    .ok{background:#eef9f0;border:1px solid #d2f1d8;padding:8px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <h1>Agendador de Férias (Período aquisitivo 2025 — férias em 2026) — Protótipo</h1>
+  <div class="container">
+    <div class="card">
+      <strong>Entrar como</strong>
+      <div style="margin-top:8px">
+        <label>Colaborador</label>
+        <select id="employeeSelect"></select>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Período desejado (início - fim)</label>
+        <div class="row">
+          <input type="date" id="startDate" />
+          <input type="date" id="endDate" />
+        </div>
+        <div style="margin-top:8px" class="row">
+          <button id="btnSchedule">Agendar (Aguardando aprovação do supervisor)</button>
+          <button id="btnClear" style="background:#eee;color:#111">Limpar</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div class="notice small">Regra importante: <strong>Nunca</strong> será permitido que duas pessoas tenham períodos que <em>se sobreponham</em>. Se já existir alguém agendado (aprovado ou pendente) para as mesmas datas, a marcação será negada.</div>
+      </div>
+
+      <div class="foot">
+        <div><strong>Prioridade automática:</strong> quem tem data de admissão mais antiga tem maior prioridade ao disputar vagas.</div>
+        <div style="margin-top:6px">Os pedidos criados ficam com status <span class="status-pendente">Pendente</span> até o supervisor aprovar.</div>
+      </div>
+
+      <hr style="margin:12px 0" />
+
+      <div>
+        <label>Acessar modo Supervisor</label>
+        <div class="row">
+          <input id="supervisorPass" placeholder="senha do supervisor" />
+          <button id="btnSupervisor">Entrar</button>
+        </div>
+        <div style="margin-top:8px" class="small muted">(senha padrão: <strong>supervisor</strong> — altere no código em produção)</div>
+      </div>
+    </div>
+
+    <div class="card" id="mainPanel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong>Solicitações de Férias</strong>
+        <div class="small muted">Dados persistidos no LocalStorage do navegador</div>
+      </div>
+
+      <div style="margin-top:10px;overflow:auto;max-height:520px">
+        <table id="requestsTable">
+          <thead>
+            <tr><th>Colaborador</th><th>Período</th><th>Solicitado em</th><th>Status</th><th class="right">Ações</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="foot" style="margin-top:12px">
+        <div><strong>Fila de prioridade (para conflitos)</strong> — lista ordenada por admissão (mais antigo primeiro) mostrada na visão do supervisor.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Dados iniciais (colaboradores) — use os dados que você enviou
+    const employees = [
+      {name: 'ALEXANDRE RIBEIRO GUARANY LIRA', role:'N2', admission:'2023-04-19'},
+      {name: 'ALISON RODRIGO GOMES DA CRUZ', role:'N2', admission:'2023-10-02'},
+      {name: 'ANTONIO LEONARDO ROCHA', role:'N2', admission:'2023-11-27'},
+      {name: 'ARTHUR PEREIRA DA ROCHA', role:'N1', admission:'2025-07-23'},
+      {name: 'ESDRAS UCHOA PEDROSO', role:'N1', admission:'2024-06-27'},
+      {name: 'FELIPE AMAZONAS DE AZEVEDO', role:'N2', admission:'2022-10-26'},
+      {name: 'FELIPE CASTRO GOMES', role:'N2', admission:'2022-07-11'},
+      {name: 'GUSTAVO SOUZA AMARAL', role:'N2', admission:'2023-07-03'},
+      {name: 'JONAS SALLES PEREIRA', role:'N2', admission:'2025-02-25'},
+      {name: 'LEONARDO SOUZA DE OLIVEIRA MOURA', role:'SUPERVISOR', admission:'2023-06-01'},
+      {name: 'MAYARA DE SOUZA MARTINS', role:'N1', admission:'2024-09-03'},
+      {name: 'RAPHAEL RICARDO DE SOUZA BARROS', role:'N2', admission:'2023-10-10'},
+      {name: 'RENATA RODRIGUES GOMES', role:'N1', admission:'2023-12-11'},
+      {name: 'RODOLPHO MAGNUS ALVES LOPES', role:'N2', admission:'2021-09-15'},
+      {name: 'THAIS NUNES ALVES', role:'N2', admission:'2021-01-11'},
+      {name: 'THIAGO LUCENA CARVALHO', role:'N2', admission:'2025-05-21'}
+    ];
+
+    // chave do localStorage
+    const STORAGE_KEY = 'axtro_ferias_requests_v1';
+
+    // Estado em memória
+    let requests = loadRequests();
+    let isSupervisor = false;
+
+    // elementos
+    const sel = document.getElementById('employeeSelect');
+    const start = document.getElementById('startDate');
+    const end = document.getElementById('endDate');
+    const btnSchedule = document.getElementById('btnSchedule');
+    const btnClear = document.getElementById('btnClear');
+    const tableBody = document.querySelector('#requestsTable tbody');
+    const btnSupervisor = document.getElementById('btnSupervisor');
+    const supervisorPass = document.getElementById('supervisorPass');
+
+    // popular select
+    function populateEmployees(){
+      sel.innerHTML = '';
+      employees.forEach((e,idx)=>{
+        const o = document.createElement('option');
+        o.value = idx;
+        o.textContent = `${e.name} — ${e.role}`;
+        sel.appendChild(o);
+      });
+    }
+
+    // helpers de data
+    function toISO(d){
+      if(!d) return null;
+      const dt = new Date(d);
+      return dt.toISOString().slice(0,10);
+    }
+
+    function overlaps(aStart,aEnd,bStart,bEnd){
+      return (aStart <= bEnd) && (bStart <= aEnd);
+    }
+
+    function saveRequests(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
+    }
+
+    function loadRequests(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return [];
+      try{ return JSON.parse(raw); }catch(e){ return []; }
+    }
+
+    // cria um novo pedido
+    function createRequest(employeeIdx, s,e){
+      const emp = employees[employeeIdx];
+      const now = new Date().toISOString();
+      const req = {
+        id: Math.random().toString(36).slice(2,9),
+        employeeIdx,
+        employeeName: emp.name,
+        start: s,
+        end: e,
+        requestedAt: now,
+        status: 'Pendente' // Pendente | Aprovado | Negado
+      };
+      requests.push(req);
+      saveRequests();
+      renderRequests();
+    }
+
+    // valida se pode criar: checa conflito com qualquer request existente (pendente ou aprovada)
+    function canCreate(employeeIdx, s, e){
+      const sISO = toISO(s);
+      const eISO = toISO(e);
+      if(!sISO || !eISO) return {ok:false,msg:'Escolha data de início e fim.'};
+      if(sISO > eISO) return {ok:false,msg:'Data de início maior que data final.'};
+
+      // verifica se existe alguma request que se sobreponha
+      for(const r of requests){
+        if(overlaps(sISO,eISO,r.start,r.end)){
+          return {ok:false,msg:`Conflict: período se sobrepõe com ${r.employeeName} (status: ${r.status}).`};
+        }
+      }
+      return {ok:true,msg:'Ok'};
+    }
+
+    // render da tabela
+    function renderRequests(){
+      tableBody.innerHTML = '';
+      // mostrar todos pedidos ordenados por requestedAt desc
+      const ordered = requests.slice().sort((a,b)=> new Date(b.requestedAt) - new Date(a.requestedAt));
+      for(const r of ordered){
+        const tr = document.createElement('tr');
+        const tdName = document.createElement('td'); tdName.textContent = r.employeeName;
+        const tdPeriod = document.createElement('td'); tdPeriod.textContent = `${r.start} → ${r.end}`;
+        const tdReq = document.createElement('td'); tdReq.textContent = new Date(r.requestedAt).toLocaleString();
+        const tdStatus = document.createElement('td');
+        tdStatus.textContent = r.status;
+        tdStatus.className = r.status === 'Pendente' ? 'status-pendente' : r.status === 'Aprovado' ? 'status-aprovado' : 'status-negado';
+        const tdActions = document.createElement('td'); tdActions.className='right';
+
+        if(isSupervisor){
+          if(r.status === 'Pendente'){
+            const btnA = document.createElement('button'); btnA.textContent='Aprovar'; btnA.style.marginRight='6px';
+            btnA.onclick = ()=>approveRequest(r.id);
+            const btnD = document.createElement('button'); btnD.textContent='Negar'; btnD.style.background='#f44336';
+            btnD.onclick = ()=>denyRequest(r.id);
+            tdActions.appendChild(btnA); tdActions.appendChild(btnD);
+          } else {
+            const b = document.createElement('button'); b.textContent='Remover'; b.style.background='#eee';
+            b.onclick = ()=>{ if(confirm('Remover este registro?')){ requests = requests.filter(x=>x.id!==r.id); saveRequests(); renderRequests(); }};
+            tdActions.appendChild(b);
+          }
+        } else {
+          // se for o dono do pedido permite cancelar enquanto estiver pendente
+          const currentIdx = parseInt(sel.value,10);
+          if(r.employeeIdx === currentIdx && r.status === 'Pendente'){
+            const btnC = document.createElement('button'); btnC.textContent='Cancelar pedido'; btnC.style.background='#eee';
+            btnC.onclick = ()=>{ if(confirm('Cancelar este pedido?')){ requests = requests.filter(x=>x.id!==r.id); saveRequests(); renderRequests(); }};
+            tdActions.appendChild(btnC);
+          } else {
+            tdActions.textContent = '-';
+          }
+        }
+
+        tr.appendChild(tdName); tr.appendChild(tdPeriod); tr.appendChild(tdReq); tr.appendChild(tdStatus); tr.appendChild(tdActions);
+        tableBody.appendChild(tr);
+      }
+
+      // se supervisor mostrar fila de prioridade
+      if(isSupervisor){
+        renderPriorityQueue();
+      } else {
+        removePriorityQueue();
+      }
+    }
+
+    function renderPriorityQueue(){
+      // cria uma visão resumida da fila ordenada por admissão (mais antigo primeiro)
+      // apenas com pedidos pendentes que conflitam entre si
+      // primeiro calcula grupos de conflitos
+      const cont = document.getElementById('priorityBox');
+      if(cont) cont.remove();
+
+      const box = document.createElement('div'); box.id='priorityBox'; box.style.marginTop='12px';
+      box.className='card';
+      const title = document.createElement('div'); title.innerHTML = '<strong>Fila de Prioridade (confli tos)</strong>';
+      box.appendChild(title);
+
+      // pendentes
+      const pendentes = requests.filter(r=>r.status==='Pendente');
+      if(pendentes.length===0){
+        const p = document.createElement('div'); p.className='small muted'; p.style.marginTop='8px'; p.textContent='Nenhum pedido pendente.'; box.appendChild(p);
+        document.getElementById('mainPanel').appendChild(box); return;
+      }
+
+      // para cada pendente listar quem tem prioridade (mais antigo admission)
+      const list = pendentes.map(r=>({
+        ...r,
+        admission: employees[r.employeeIdx].admission
+      })).sort((a,b)=> new Date(a.admission) - new Date(b.admission));
+
+      const ul = document.createElement('div'); ul.style.marginTop='8px';
+      list.forEach((p,idx)=>{
+        const d = document.createElement('div'); d.className='row'; d.style.marginBottom='6px';
+        const left = document.createElement('div'); left.style.flex='1';
+        left.innerHTML = `<strong>${p.employeeName}</strong> — ${p.start} → ${p.end} <div class="small muted">Admissão: ${employees[p.employeeIdx].admission}</div>`;
+        const pri = document.createElement('div'); pri.className='small'; pri.style.width='140px'; pri.textContent = `Prioridade #${idx+1}`;
+        d.appendChild(left); d.appendChild(pri);
+        ul.appendChild(d);
+      });
+
+      box.appendChild(ul);
+      document.getElementById('mainPanel').appendChild(box);
+    }
+
+    function removePriorityQueue(){
+      const cont = document.getElementById('priorityBox'); if(cont) cont.remove();
+    }
+
+    // aprovar — enquanto aprova, checar se não sobrepõe com outro aprovado
+    function approveRequest(id){
+      const idx = requests.findIndex(r=>r.id===id);
+      if(idx===-1) return alert('Pedido não encontrado');
+      const r = requests[idx];
+      // checar conflito com pedidos aprovados existentes
+      for(const other of requests){
+        if(other.id===r.id) continue;
+        if(other.status === 'Aprovado' && overlaps(r.start,r.end,other.start,other.end)){
+          return alert('Não é possível aprovar: entra em conflito com ' + other.employeeName + ' (aprovado).');
+        }
+      }
+      requests[idx].status = 'Aprovado';
+      saveRequests();
+      renderRequests();
+    }
+
+    function denyRequest(id){
+      const idx = requests.findIndex(r=>r.id===id);
+      if(idx===-1) return alert('Pedido não encontrado');
+      requests[idx].status = 'Negado';
+      saveRequests();
+      renderRequests();
+    }
+
+    // eventos
+    btnSchedule.onclick = ()=>{
+      const idx = parseInt(sel.value,10);
+      const s = start.value; const e = end.value;
+      const check = canCreate(idx, s, e);
+      if(!check.ok){
+        alert('Não foi possível criar o pedido: ' + check.msg);
+        return;
+      }
+      createRequest(idx,s,e);
+      alert('Pedido criado com status: Aguardando aprovação do supervisor.');
+      start.value=''; end.value='';
+    };
+
+    btnClear.onclick = ()=>{ start.value=''; end.value=''; };
+
+    btnSupervisor.onclick = ()=>{
+      const pass = supervisorPass.value || '';
+      if(pass === 'supervisor'){
+        isSupervisor = !isSupervisor;
+        btnSupervisor.textContent = isSupervisor ? 'Sair do modo Supervisor' : 'Entrar';
+        document.querySelector('.supervisor-badge')?.remove();
+        if(isSupervisor){
+          const b = document.createElement('span'); b.className='supervisor-badge'; b.textContent='Supervisor';
+          document.querySelector('h1').appendChild(document.createTextNode(' '));
+          document.querySelector('h1').appendChild(b);
+        } else {
+          document.querySelector('h1').querySelector('.supervisor-badge')?.remove();
+        }
+        renderRequests();
+      } else {
+        alert('Senha inválida para o modo supervisor. (senha padrão: supervisor)');
+      }
+    };
+
+    // inicialização
+    populateEmployees();
+    renderRequests();
+
+    // para debugging: limpar storage com ?clear=1 na query
+    if(location.search.includes('clear=1')){ localStorage.removeItem(STORAGE_KEY); requests = []; renderRequests(); }
+
+  </script>
+</body>
+</html>
