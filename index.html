@@ -30,8 +30,15 @@
         <label>Data de Início:</label>
         <input type="date" id="inicio">
 
-        <label>Data de Fim:</label>
-        <input type="date" id="fim">
+        <label>Duração das férias:</label>
+        <select id="duracao">
+            <option value="">Selecione</option>
+            <option value="15">15 dias</option>
+            <option value="20">20 dias</option>
+            <option value="30">30 dias</option>
+        </select>
+
+        <p id="infoRetorno" style="font-weight: bold; color: blue;"></p>
 
         <button class="btn" onclick="agendarFerias()">Agendar</button>
     </div>
@@ -45,6 +52,7 @@
                 <th>Colaborador</th>
                 <th>Início</th>
                 <th>Fim</th>
+                <th>Retorno</th>
                 <th>Status</th>
                 <th>Ações (Supervisor)</th>
             </tr>
@@ -108,6 +116,7 @@ function renderFerias() {
             <td>${f.nome}</td>
             <td>${f.inicio}</td>
             <td>${f.fim}</td>
+            <td>${f.retorno}</td>
             <td class="${f.status.toLowerCase()}">${f.status}</td>
             <td>
                 ${supervisorLogado && f.status === "Pendente" ?
@@ -130,23 +139,65 @@ function verificaConflito(inicio, fim) {
     });
 }
 
+document.getElementById("duracao").addEventListener("change", () => {
+    const inicio = document.getElementById("inicio").value;
+    const duracao = parseInt(document.getElementById("duracao").value);
+    if (!inicio || !duracao) return;
+
+    const dataInicio = new Date(inicio);
+    const dataFim = new Date(dataInicio);
+    dataFim.setDate(dataFim.getDate() + duracao - 1); // último dia de férias
+
+    const retorno = new Date(dataFim);
+    retorno.setDate(retorno.getDate() + 1); // retorno ao trabalho
+
+    document.getElementById("infoRetorno").textContent =
+        `Férias até ${dataFim.toLocaleDateString("pt-BR")} - Retorno: ${retorno.toLocaleDateString("pt-BR")}`;
+});
+
 function agendarFerias() {
     const nome = selectColab.value;
     const inicio = document.getElementById("inicio").value;
-    const fim = document.getElementById("fim").value;
-    const admissao = colaboradores.find(c => c.nome === nome).admissao;
+    const duracao = parseInt(document.getElementById("duracao").value);
 
-    if (!inicio || !fim) {
-        alert("Preencha as datas.");
+    if (!inicio || !duracao) {
+        alert("Preencha a data de início e a duração.");
         return;
     }
 
-    if (verificaConflito(inicio, fim)) {
+    if (![15, 20, 30].includes(duracao)) {
+        alert("Somente 15, 20 ou 30 dias são permitidos.");
+        return;
+    }
+
+    const dataInicio = new Date(inicio);
+    const hoje = new Date();
+    hoje.setHours(0,0,0,0);
+    if (dataInicio < hoje) {
+        alert("A data de início não pode ser no passado.");
+        return;
+    }
+
+    const dataFim = new Date(dataInicio);
+    dataFim.setDate(dataFim.getDate() + duracao - 1);
+
+    const retorno = new Date(dataFim);
+    retorno.setDate(retorno.getDate() + 1);
+
+    if (verificaConflito(inicio, dataFim.toISOString().split("T")[0])) {
         alert("Já existe alguém de férias nesse período.");
         return;
     }
 
-    ferias.push({ nome, inicio, fim, status: "Pendente", admissao });
+    const admissao = colaboradores.find(c => c.nome === nome).admissao;
+    ferias.push({ 
+        nome, 
+        inicio, 
+        fim: dataFim.toISOString().split("T")[0], 
+        retorno: retorno.toISOString().split("T")[0],
+        status: "Pendente", 
+        admissao 
+    });
     salvar();
     renderFerias();
     alert("Aguardando aprovação do supervisor.");
@@ -154,7 +205,7 @@ function agendarFerias() {
 
 function loginSupervisor() {
     const senha = document.getElementById("senhaSupervisor").value;
-    if (senha === "Leo!") {
+    if (senha === "supervisor") {
         supervisorLogado = true;
         alert("Supervisor logado.");
         renderFerias();
@@ -179,4 +230,3 @@ renderFerias();
 </script>
 </body>
 </html>
-
