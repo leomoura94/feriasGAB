@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Agendamento de Férias - 2026</title>
 <style>
     body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
@@ -12,11 +12,12 @@
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
     th { background: #eee; }
-    .btn { cursor: pointer; border: none; border-radius: 5px; }
+    .btn { cursor: pointer; border: none; border-radius: 5px; padding: 5px 10px; }
     .aprovado { background: green; color: white; }
     .negado { background: red; color: white; }
     .pendente { background: orange; color: white; }
 </style>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -37,13 +38,18 @@
             <option value="20">20 dias</option>
             <option value="30">30 dias</option>
         </select>
-      
+
+        <p id="infoRetorno" style="font-weight: bold; color: blue;"></p>
+
         <button class="btn" onclick="agendarFerias()">Agendar</button>
     </div>
 
     <hr>
 
     <h2>Solicitações</h2>
+    <button onclick="baixarCSV()" style="margin-bottom: 10px;">Baixar solicitações (CSV)</button>
+    <button onclick="baixarExcel()" style="margin-left:10px; margin-bottom: 10px;">Baixar Excel (.xlsx)</button>
+
     <table>
         <thead>
             <tr>
@@ -53,7 +59,7 @@
                 <th>Retorno</th>
                 <th>Status</th>
                 <th>Ações (Supervisor)</th>
-                <th>RH</th>
+                <th>Formulário RH</th>
             </tr>
         </thead>
         <tbody id="listaFerias"></tbody>
@@ -62,8 +68,8 @@
     <hr>
 
     <h2>Login Supervisor</h2>
-    <input type="password" id="senhaSupervisor" placeholder="Senha do supervisor">
-    <button onclick="loginSupervisor()">Entrar</button>
+    <input type="password" id="senhaSupervisor" placeholder="Senha do supervisor" style="width: 200px;">
+    <button onclick="loginSupervisor()" style="width: 120px;">Entrar</button>
 </div>
 
 <script>
@@ -109,7 +115,6 @@ function renderFerias() {
     ferias.sort((a, b) => new Date(a.admissao) - new Date(b.admissao));
 
     ferias.forEach((f, idx) => {
-        // Mostra status com " - Enviado" se formularioEnviado == true
         const statusTexto = f.status + (f.formularioEnviado ? " - Enviado" : "");
 
         let tr = document.createElement("tr");
@@ -145,7 +150,6 @@ function toggleFormularioRH(idx) {
     renderFerias();
 }
 
-// Função para gerar CSV e disparar download
 function baixarCSV() {
     if (ferias.length === 0) {
         alert("Nenhuma solicitação para exportar.");
@@ -174,6 +178,35 @@ function baixarCSV() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+function baixarExcel() {
+    if (ferias.length === 0) {
+        alert("Nenhuma solicitação para exportar.");
+        return;
+    }
+
+    const dados = [
+        ["Colaborador", "Início", "Fim", "Retorno", "Status", "Admissão", "Formulário RH"]
+    ];
+
+    ferias.forEach(f => {
+        dados.push([
+            f.nome,
+            f.inicio,
+            f.fim,
+            f.retorno,
+            f.status,
+            f.admissao,
+            f.formularioEnviado ? "Sim" : "Não"
+        ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(dados);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Solicitações");
+
+    XLSX.writeFile(wb, "solicitacoes_ferias.xlsx");
 }
 
 function verificaConflito(inicio, fim) {
@@ -280,7 +313,7 @@ function agendarFerias() {
 
 function loginSupervisor() {
     const senha = document.getElementById("senhaSupervisor").value;
-    if (senha === "Supervisor2025!") {
+    if (senha === "supervisor") {
         supervisorLogado = true;
         alert("Supervisor logado.");
         renderFerias();
@@ -311,3 +344,6 @@ function excluir(idx) {
 
 renderFerias();
 </script>
+
+</body>
+</html>
