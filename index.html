@@ -139,17 +139,35 @@ function verificaConflito(inicio, fim) {
     });
 }
 
+const inputInicio = document.getElementById("inicio");
+
+function formatDateToYYYYMMDD(date) {
+    const yyyy = date.getFullYear();
+    let mm = date.getMonth() + 1;
+    let dd = date.getDate();
+    if (mm < 10) mm = '0' + mm;
+    if (dd < 10) dd = '0' + dd;
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+window.onload = () => {
+    const hoje = new Date();
+    const maxDate = new Date("2030-12-31");
+    inputInicio.min = formatDateToYYYYMMDD(hoje);
+    inputInicio.max = formatDateToYYYYMMDD(maxDate);
+};
+
 document.getElementById("duracao").addEventListener("change", () => {
-    const inicio = document.getElementById("inicio").value;
+    const inicio = inputInicio.value;
     const duracao = parseInt(document.getElementById("duracao").value);
     if (!inicio || !duracao) return;
 
     const dataInicio = new Date(inicio);
     const dataFim = new Date(dataInicio);
-    dataFim.setDate(dataFim.getDate() + duracao - 1); // último dia de férias
+    dataFim.setDate(dataFim.getDate() + duracao - 1);
 
     const retorno = new Date(dataFim);
-    retorno.setDate(retorno.getDate() + 1); // retorno ao trabalho
+    retorno.setDate(retorno.getDate() + 1);
 
     document.getElementById("infoRetorno").textContent =
         `Férias até ${dataFim.toLocaleDateString("pt-BR")} - Retorno: ${retorno.toLocaleDateString("pt-BR")}`;
@@ -157,7 +175,7 @@ document.getElementById("duracao").addEventListener("change", () => {
 
 function agendarFerias() {
     const nome = selectColab.value;
-    const inicio = document.getElementById("inicio").value;
+    const inicio = inputInicio.value;
     const duracao = parseInt(document.getElementById("duracao").value);
 
     if (!inicio || !duracao) {
@@ -173,8 +191,16 @@ function agendarFerias() {
     const dataInicio = new Date(inicio);
     const hoje = new Date();
     hoje.setHours(0,0,0,0);
+    const maxAno = new Date("2030-12-31");
+    maxAno.setHours(23,59,59,999);
+
     if (dataInicio < hoje) {
         alert("A data de início não pode ser no passado.");
+        return;
+    }
+
+    if (dataInicio > maxAno) {
+        alert("A data de início não pode ser após 31/12/2030.");
         return;
     }
 
@@ -205,7 +231,7 @@ function agendarFerias() {
 
 function loginSupervisor() {
     const senha = document.getElementById("senhaSupervisor").value;
-    if (senha === "supervisor") {
+    if (senha === "Leo!") {
         supervisorLogado = true;
         alert("Supervisor logado.");
         renderFerias();
@@ -228,5 +254,4 @@ function negar(idx) {
 
 renderFerias();
 </script>
-</body>
-</html>
+
